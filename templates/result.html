@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Dashboard - Traffic Monitoring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* PDF / Print button */
+        .top-bar {
+            position: fixed;
+            top: 0; right: 0;
+            left: 240px;
+            height: 50px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 30px;
+            gap: 12px;
+            z-index: 50;
+        }
+        .main-content { padding-top: 70px; }
+
+        /* Print styles */
+        @media print {
+            .sidebar, .top-bar, .btn-group, .no-print { display: none !important; }
+            .main-content { margin-left: 0 !important; padding: 20px !important; }
+            body { background: #fff !important; color: #000 !important; }
+            .hero, .stat-card, .chart-card, .video-card, .frame-card, .vehicle-table-wrap {
+                background: #f9f9f9 !important;
+                border: 1px solid #ddd !important;
+                color: #000 !important;
+                box-shadow: none !important;
+            }
+            .stat-card h4, .chart-card h4 { color: #555 !important; }
+            .stat-value { color: #111 !important; }
+            .section-header { color: #000 !important; border-color: #ddd !important; }
+            .hero h1, .hero h1 span { color: #000 !important; }
+            .hero p { color: #555 !important; }
+            footer { color: #666 !important; }
+            footer strong { color: #000 !important; }
+            canvas { max-height: 250px !important; }
+            .vehicle-table th { background: #e5e7eb !important; color: #000 !important; }
+            .vehicle-table td { color: #000 !important; }
+        }
+
+        @media (max-width: 768px) {
+            .top-bar { left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Bar -->
+    <div class="top-bar no-print">
+        <button class="btn btn-primary" onclick="window.print()" style="padding: 8px 18px; font-size: 0.85rem;">
+            📄 Download PDF Report
+        </button>
+    </div>
+
+    <nav class="sidebar">
+        <div class="logo">🚦 TrafficAI</div>
+        <ul class="nav-links">
+            <li><a href="#stats" class="active"><span class="nav-icon">📊</span> Stats</a></li>
+            <li><a href="#vehicles"><span class="nav-icon">🚗</span> Vehicles</a></li>
+            <li><a href="#video"><span class="nav-icon">🎬</span> Video</a></li>
+            <li><a href="#snapshots"><span class="nav-icon">🖼️</span> Snapshots</a></li>
+            <li><a href="#analytics"><span class="nav-icon">📈</span> Analytics</a></li>
+            <li><a href="#downloads"><span class="nav-icon">⬇️</span> Downloads</a></li>
+            <li><a href="/"><span class="nav-icon">🔁</span> New Analysis</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+
+        <!-- Header -->
+        <section class="hero" style="padding: 40px; margin-bottom: 40px;">
+            <h1>Analysis <span>Dashboard</span></h1>
+            <p>Results generated from your uploaded video using YOLOv8 deep learning model.</p>
+        </section>
+
+        <!-- Stats Cards -->
+        <section id="stats" class="section">
+            <h2 class="section-header"><span class="icon">📊</span> Detection Summary</h2>
+            <div class="stats-grid">
+                <div class="stat-card highlight">
+                    <div class="stat-icon">🚗</div>
+                    <h4>Total Vehicles</h4>
+                    <div class="stat-value text-primary">{{ total_vehicles }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <h4>Safe Vehicles</h4>
+                    <div class="stat-value text-safe" id="safeCount">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚠️</div>
+                    <h4>Warning Vehicles</h4>
+                    <div class="stat-value text-warning" id="warningCount">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🚨</div>
+                    <h4>Danger Vehicles</h4>
+                    <div class="stat-value text-danger" id="dangerCount">—</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vehicle Summary Table -->
+        <section id="vehicles" class="section">
+            <h2 class="section-header"><span class="icon">🚗</span> Vehicle Summary</h2>
+            <div class="vehicle-table-wrap">
+                <table class="vehicle-table" id="vehicleTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Type</th>
+                            <th>Avg Speed (km/h)</th>
+                            <th>Max Speed (km/h)</th>
+                            <th>Lane</th>
+                            <th>Lanes Used</th>
+                            <th>Status</th>
+                            <th>Accident Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vehicleTableBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <p class="table-legend" style="margin-top: 12px; font-size: 0.85rem; color: var(--text-muted);">
+                🟢 <span style="color: var(--safe);">SAFE</span> &nbsp; | &nbsp;
+                🟡 <span style="color: var(--warning);">WARNING</span> &nbsp; | &nbsp;
+                🔴 <span style="color: var(--danger);">DANGER</span>
+            </p>
+        </section>
+
+        <!-- Video Player -->
+        <section id="video" class="section">
+            <h2 class="section-header"><span class="icon">🎬</span> Processed Video</h2>
+            <div class="video-card">
+                <video controls>
+                    <source src="{{ url_for('static', filename='outputs/' ~ analysis_id|string ~ '/output.mp4') }}" type="video/mp4">
+                    Your browser does not support video playback.
+                </video>
+                <p style="color: var(--text-muted); margin-top: 12px; font-size: 0.9rem;">
+                    If the video does not play in the browser, use the download button below.
+                </p>
+            </div>
+        </section>
+
+        <!-- Snapshots -->
+        <section id="snapshots" class="section">
+            <h2 class="section-header"><span class="icon">🖼️</span> Detection Snapshots</h2>
+            {% if frames %}
+            <div class="frames-grid">
+                {% for frame in frames %}
+                <div class="frame-card">
+                    <img src="{{ url_for('static', filename='outputs/' ~ analysis_id|string ~ '/frames/' ~ frame) }}" alt="Detection Frame {{ loop.index }}">
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="no-data">No snapshot frames were captured during processing.</p>
+            {% endif %}
+        </section>
+
+        <!-- Analytics Charts -->
+        <section id="analytics" class="section">
+            <h2 class="section-header"><span class="icon">📈</span> Data Analytics</h2>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h4>Vehicle Count Over Time</h4>
+                    <canvas id="countChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Speed Distribution</h4>
+                    <canvas id="speedChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Vehicle Type Breakdown</h4>
+                    <canvas id="typeChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Lane Distribution</h4>
+                    <canvas id="laneChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Danger & Overspeed Events</h4>
+                    <canvas id="dangerChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Accident Risk Assessment</h4>
+                    <canvas id="riskChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Downloads -->
+        <section id="downloads" class="section no-print">
+            <h2 class="section-header"><span class="icon">⬇️</span> Download Reports</h2>
+            <div class="btn-group" style="justify-content: flex-start;">
+                <a href="/download-video/{{ analysis_id }}" class="btn btn-primary">🎥 Download Processed Video</a>
+                <a href="/download-excel/{{ analysis_id }}" class="btn btn-success">📊 Download Traffic Logs (Excel)</a>
+                <button class="btn btn-outline" onclick="window.print()">📄 Save as PDF</button>
+                <a href="/" class="btn btn-outline">🔁 Run New Analysis</a>
+            </div>
+        </section>
+
+        <footer>
+            <p><strong>Traffic Monitoring System</strong> — AI-Powered Real-Time Detection | Built with YOLOv8 + Flask</p>
+        </footer>
+
+    </main>
+
+    <script>
+        // ─── Parse Data from Backend with Safeties ───
+        const countData = {{ chart_count_data|safe }} || { labels: [], data: [] };
+        const speedData = {{ chart_speed_data|safe }} || { labels: [], data: [] };
+        const typeData = {{ chart_type_data|safe }} || { labels: [], data: [] };
+        const dangerData = {{ chart_danger_data|safe }} || { labels: ["Too Close", "Overspeed"], data: [0, 0] };
+        const laneData = {{ chart_lane_data|safe }} || { labels: [], data: [] };
+        const riskData = {{ chart_risk_data|safe }} || { labels: ["Low", "Medium", "High"], data: [0, 0, 0] };
+        const vehicleSummary = {{ vehicle_summary|safe }} || [];
+
+        // ─── Warning Sound Function (Web Audio API) ───
+        function playDangerSound() {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            function playTone(freq, type, start, duration) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime + start);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + start);
+                osc.stop(audioCtx.currentTime + start + duration);
+            }
+
+            // Dual tone alert (Beep-Beep)
+            playTone(880, 'square', 0, 0.15);
+            playTone(880, 'square', 0.2, 0.15);
+        }
+
+        // ─── 1. Update Stat Cards (Priority) ───
+        let safeCount = 0, warningCount = 0, dangerCountVal = 0;
+        
+        if (Array.isArray(vehicleSummary)) {
+            vehicleSummary.forEach(v => {
+                if (v.Status === 'DANGER') dangerCountVal++;
+                else if (v.Status === 'WARNING') warningCount++;
+                else safeCount++;
+            });
+        }
+
+        document.getElementById('safeCount').textContent = safeCount;
+        document.getElementById('warningCount').textContent = warningCount;
+        document.getElementById('dangerCount').textContent = dangerCountVal;
+
+        // ─── 2. Populate Vehicle Summary Table ───
+        const tbody = document.getElementById('vehicleTableBody');
+        if (Array.isArray(vehicleSummary) && vehicleSummary.length > 0) {
+            tbody.innerHTML = ''; // Clear placeholder
+            vehicleSummary.forEach(v => {
+                const tr = document.createElement('tr');
+                let rowClass = 'row-safe';
+                let badgeClass = 'badge-safe';
+                let riskBadge = 'badge-safe';
+
+                if (v.Status === 'DANGER') {
+                    rowClass = 'row-danger';
+                    badgeClass = 'badge-danger';
+                } else if (v.Status === 'WARNING') {
+                    rowClass = 'row-warning';
+                    badgeClass = 'badge-warning';
+                }
+
+                if (v.Accident_Risk === 'High') riskBadge = 'badge-danger';
+                else if (v.Accident_Risk === 'Medium') riskBadge = 'badge-warning';
+
+                tr.className = rowClass;
+                tr.innerHTML = `
+                    <td><strong>#${v['Vehicle_#'] || 0}</strong></td>
+                    <td>${v.Vehicle_Type || 'Unknown'}</td>
+                    <td>${v.Avg_Speed_kmph || 0}</td>
+                    <td>${v.Max_Speed_kmph || 0}</td>
+                    <td>${v.Lane || '-'}</td>
+                    <td>${v.Lanes_Used || 1}</td>
+                    <td><span class="status-badge ${badgeClass}" 
+                              ${v.Status === 'DANGER' ? 'onclick="playDangerSound()" style="cursor:pointer;" title="Click for Alert"' : ''}>
+                              ${v.Status || 'SAFE'}
+                        </span>
+                    </td>
+                    <td><span class="status-badge ${riskBadge}">${v.Accident_Risk || 'Low'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding: 30px;">No vehicle data available.</td></tr>';
+        }
+
+        // ─── 3. Initialize Charts (Wrapped in try-catch for robustness) ───
+        try {
+            // Chart Defaults
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+
+            // Vehicle Count Line Chart
+            if (countData.labels && countData.labels.length > 0) {
+                new Chart(document.getElementById('countChart'), {
+                    type: 'line',
+                    data: {
+                        labels: countData.labels,
+                        datasets: [{
+                            label: 'Active Vehicles per Frame',
+                            data: countData.data,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59,130,246,0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { display: true } } }
+                });
+            }
+
+            // Speed Distribution Bar Chart
+            if (speedData.labels && speedData.labels.length > 0) {
+                new Chart(document.getElementById('speedChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: speedData.labels,
+                        datasets: [{
+                            label: 'Vehicles in Speed Range',
+                            data: speedData.data,
+                            backgroundColor: ['#22c55e', '#3b82f6', '#eab308', '#f97316', '#ef4444'],
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+
+            // Vehicle Type Doughnut Chart
+            if (typeData.labels && typeData.labels.length > 0) {
+                new Chart(document.getElementById('typeChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: typeData.labels,
+                        datasets: [{
+                            data: typeData.data,
+                            backgroundColor: ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+
+            // Lane Distribution Pie Chart
+            if (laneData.labels && laneData.labels.length > 0) {
+                new Chart(document.getElementById('laneChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: laneData.labels,
+                        datasets: [{
+                            data: laneData.data,
+                            backgroundColor: ['#6366f1', '#22c55e', '#f59e0b', '#ef4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+
+            // Danger Events Bar Chart
+            if (dangerData.labels && dangerData.labels.length > 0) {
+                new Chart(document.getElementById('dangerChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: dangerData.labels,
+                        datasets: [{
+                            label: 'Event Count',
+                            data: dangerData.data,
+                            backgroundColor: ['#ef4444', '#eab308'],
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { responsive: true, indexAxis: 'y' }
+                });
+            }
+
+            // Accident Risk Doughnut Chart
+            if (riskData.labels && riskData.labels.length > 0) {
+                const totalRisk = (riskData.data || []).reduce((a, b) => a + (b || 0), 0);
+                if (totalRisk > 0) {
+                    new Chart(document.getElementById('riskChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: riskData.labels,
+                            datasets: [{
+                                data: riskData.data,
+                                backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: { responsive: true }
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Chart initialization failed:", err);
+        }
+
+        // Active nav on scroll
+        const sections = document.querySelectorAll('.section');
+        const navLinks = document.querySelectorAll('.nav-links a');
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(s => {
+                if (window.scrollY >= s.offsetTop - 100) current = s.getAttribute('id');
+            });
+            navLinks.forEach(a => {
+                a.classList.remove('active');
+                if (a.getAttribute('href') === '#' + current) a.classList.add('active');
+            });
+        });
+    </script>
+
+</body>
+</html>

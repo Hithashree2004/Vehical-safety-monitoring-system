@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Monitoring System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="logo">🚦 TrafficAI</div>
+        <ul class="nav-links">
+            <li><a href="#hero" class="active"><span class="nav-icon">🏠</span> Home</a></li>
+            <li><a href="#upload"><span class="nav-icon">📤</span> Upload</a></li>
+            <li><a href="#overview"><span class="nav-icon">📋</span> Overview</a></li>
+            <li><a href="#history"><span class="nav-icon">📜</span> History</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+
+        <!-- Hero -->
+        <section id="hero" class="hero">
+            <h1>AI-Powered <span>Traffic Monitoring</span> System</h1>
+            <p>Real-time vehicle detection, tracking, and road safety analysis using YOLOv8 deep learning.</p>
+            <a href="#upload" class="btn btn-primary">🎬 Upload Video to Analyze</a>
+        </section>
+
+        <!-- Upload -->
+        <section id="upload" class="section">
+            <h2 class="section-header"><span class="icon">📤</span> Upload Traffic Video</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">🎥</div>
+                    <p>Drag & drop your traffic video here, or click to browse</p>
+                    <p style="font-size: 0.85rem;">Supports MP4, AVI, MOV formats</p>
+                    <input type="file" name="video" id="videoInput" required class="file-input" accept="video/*">
+                    <label for="videoInput" class="file-label">📁 Choose File</label>
+                    <span id="fileName"></span>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-success" id="analyzeBtn">🚀 Analyze & View Dashboard</button>
+                </div>
+            </form>
+            <div class="loader" id="loader" style="display: none;">
+                <div class="spinner"></div>
+                <p>Processing video with YOLOv8 neural network... Please wait.</p>
+            </div>
+        </section>
+
+        <!-- Overview -->
+        <section id="overview" class="section">
+            <h2 class="section-header"><span class="icon">📋</span> Project Overview</h2>
+            <div class="overview-grid">
+                <div class="overview-item"><span class="ov-icon">🧠</span><p>A deep learning-based traffic monitoring system designed to analyze road activity in real time using computer vision techniques.</p></div>
+                <div class="overview-item"><span class="ov-icon">🎯</span><p>Utilizes YOLOv8 to detect and classify vehicles such as cars, bikes, and trucks from live video streams.</p></div>
+                <div class="overview-item"><span class="ov-icon">📹</span><p>Processes input from CCTV cameras or webcams to continuously monitor traffic conditions.</p></div>
+                <div class="overview-item"><span class="ov-icon">🛣️</span><p>Applies lane segmentation to identify road lanes and structure.</p></div>
+                <div class="overview-item"><span class="ov-icon">🔢</span><p>Tracks vehicles across frames by assigning a unique ID to each object.</p></div>
+                <div class="overview-item"><span class="ov-icon">⚡</span><p>Estimates vehicle speed based on motion (pixel displacement over time).</p></div>
+                <div class="overview-item"><span class="ov-icon">📏</span><p>Computes distance between vehicles to assess traffic density and safety.</p></div>
+                <div class="overview-item"><span class="ov-icon">⚠️</span><p>Detects unsafe driving behavior and evaluates potential accident risks.</p></div>
+                <div class="overview-item"><span class="ov-icon">🔔</span><p>Generates real-time alerts (sound and email) for critical situations.</p></div>
+                <div class="overview-item"><span class="ov-icon">💾</span><p>Stores detected data and alerts in an SQLite database for analysis and reporting.</p></div>
+            </div>
+        </section>
+
+        <!-- History -->
+        <section id="history" class="section">
+            <h2 class="section-header"><span class="icon">📜</span> Analysis History</h2>
+            {% if history %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Video Filename</th>
+                            <th>Vehicles</th>
+                            <th>Analysis Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in history %}
+                        <tr style="cursor: pointer;" onclick="window.location='/result/{{ item.id }}'">
+                            <td>{{ loop.index }}</td>
+                            <td>{{ item.filename }}</td>
+                            <td>{{ item.total_vehicles }}</td>
+                            <td>{{ item.timestamp }}</td>
+                            <td><a href="/result/{{ item.id }}" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.8rem;">📊 View</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="no-data">No videos analyzed yet. Upload a video to get started!</p>
+            {% endif %}
+        </section>
+
+        <footer>
+            <p><strong>Traffic Monitoring System</strong> — AI-Powered Real-Time Detection | Built with YOLOv8 + Flask</p>
+        </footer>
+
+    </main>
+
+    <script>
+        // File name display
+        document.getElementById('videoInput').addEventListener('change', function(e) {
+            var name = e.target.files[0] ? e.target.files[0].name : '';
+            document.getElementById('fileName').textContent = name ? '📄 ' + name : '';
+            if(name) {
+                document.getElementById('uploadArea').style.borderColor = '#22c55e';
+            }
+        });
+
+        // Loading state on submit
+        document.getElementById('uploadForm').addEventListener('submit', function() {
+            document.getElementById('analyzeBtn').style.display = 'none';
+            document.getElementById('loader').style.display = 'block';
+        });
+
+        // Active nav highlight on scroll
+        const sections = document.querySelectorAll('.section, .hero');
+        const navLinks = document.querySelectorAll('.nav-links a');
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(s => {
+                if(window.scrollY >= s.offsetTop - 100) {
+                    current = s.getAttribute('id');
+                }
+            });
+            navLinks.forEach(a => {
+                a.classList.remove('active');
+                if(a.getAttribute('href') === '#' + current) a.classList.add('active');
+            });
+        });
+    </script>
+
+</body>
+</html>
