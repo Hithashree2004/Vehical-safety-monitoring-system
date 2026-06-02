@@ -1,8 +1,8 @@
-# 🚦 Deep Learning Based Traffic Monitoring System using YOLOv8
+# 🚦 Deep Learning Vehical Safety Monitoring System using YOLOv8
 
 ## 📌 Project Overview
 
-This project is a Deep Learning based Traffic Monitoring System that analyzes traffic videos using YOLOv8 and Computer Vision techniques.
+This project is a Deep Learning based Vehical Safety System that analyzes traffic videos using YOLOv8 and Computer Vision techniques.
 
 The system allows users to upload a traffic video through a Flask web application. The uploaded video is processed frame by frame to detect vehicles such as cars, bikes, buses, and trucks. The system generates a processed output video with bounding boxes, vehicle count, basic speed estimation, danger alerts, and downloadable traffic logs in Excel format.
 
@@ -181,7 +181,7 @@ GitHub: [Hithashree2004](https://github.com/Hithashree2004)
 
 ## 📌 Project Title
 
-**Deep Learning Based Intelligent Traffic Monitoring System using YOLOv8**
+**Deep Learning Based Vehical Safety  Monitoring System using YOLOv8**
 
 ```
 ```
