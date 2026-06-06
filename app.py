@@ -63,7 +63,7 @@ def upload():
 
     frames = sorted(os.listdir(frames_dir))
 
-    return render_template("result.html",
+    return render_template("result.html,
                            analysis_id=history_id,
                            frames=frames,
                            total_vehicles=chart_data["total_vehicles"],
