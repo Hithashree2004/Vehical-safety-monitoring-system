@@ -1,4 +1,4 @@
-flask
+fl
 ultralytics
 opencv-python-headless
 pandas
